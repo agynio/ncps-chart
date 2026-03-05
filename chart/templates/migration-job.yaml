@@ -44,6 +44,10 @@ spec:
         - name: {{ $secret }}
         {{- end }}
       {{- end }}
+      {{- if .Values.migrationJob.initContainers }}
+      initContainers:
+{{ toYaml .Values.migrationJob.initContainers | nindent 8 }}
+      {{- end }}
       containers:
         - name: migrate
           image: {{ $jobImage | quote }}
