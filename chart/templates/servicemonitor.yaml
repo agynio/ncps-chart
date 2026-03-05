@@ -1,0 +1,3 @@
+{{- $values := deepCopy .Values -}}
+{{- $ctx := dict "Chart" .Chart "Values" $values "Release" .Release "Capabilities" .Capabilities "Template" .Template "Files" .Files -}}
+{{ include "service-base.metrics" $ctx }}
