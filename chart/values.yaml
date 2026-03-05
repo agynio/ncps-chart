@@ -1,0 +1,220 @@
+nameOverride: ""
+fullnameOverride: ""
+
+commonAnnotations: {}
+
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+
+image:
+  registry: ""
+  repository: kalbasit/ncps
+  tag: latest
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+replicaCount: 1
+revisionHistoryLimit: 10
+updateStrategy: {}
+deploymentAnnotations: {}
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  enabled: false
+  fsGroup: null
+
+securityContext:
+  enabled: true
+  runAsNonRoot: true
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+automountServiceAccountToken: true
+
+rbac:
+  create: false
+  clusterWide: false
+  rules: []
+
+service:
+  enabled: true
+  type: ClusterIP
+  annotations: {}
+  labels: {}
+  ports:
+    - name: http
+      port: 8501
+      targetPort: http
+
+containerPorts:
+  - name: http
+    containerPort: 8501
+    protocol: TCP
+
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+priorityClassName: ""
+terminationGracePeriodSeconds: null
+topologySpreadConstraints: []
+
+initContainers:
+  - name: ncps-init
+    image: alpine:3.20
+    command:
+      - /bin/sh
+      - -c
+      - mkdir -m 0755 -p /storage/var && mkdir -m 0700 -p /storage/var/ncps && mkdir -m 0700 -p /storage/var/ncps/db
+    volumeMounts:
+      - name: storage
+        mountPath: /storage
+
+extraContainers: []
+
+lifecycle: {}
+
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /nix-cache-info
+    port: http
+  failureThreshold: 3
+  periodSeconds: 30
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /nix-cache-info
+    port: http
+  failureThreshold: 3
+  periodSeconds: 10
+
+startupProbe:
+  enabled: true
+  httpGet:
+    path: /nix-cache-info
+    port: http
+  failureThreshold: 12
+  periodSeconds: 5
+
+command:
+  - /bin/ncps
+
+args:
+  - serve
+  - --server-addr=0.0.0.0:8501
+  - --cache-hostname=ncps
+  - --cache-data-path=/storage
+  - --cache-database-url=sqlite:/storage/var/ncps/db/db.sqlite
+  - --upstream-cache=https://cache.nixos.org
+  - --upstream-public-key=cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+
+env:
+  - name: PROMETHEUS_ENABLED
+    value: "true"
+envFrom: []
+extraEnvVars: []
+extraEnvVarsCM: ""
+extraEnvVarsSecret: ""
+
+configMounts: []
+extraVolumeMounts: []
+extraVolumes: []
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: null
+  metrics: []
+  behavior: {}
+
+pdb:
+  enabled: false
+  minAvailable: null
+  maxUnavailable: null
+
+ingress:
+  enabled: false
+  ingressClassName: ""
+  annotations: {}
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: Prefix
+          servicePort: http
+  tls: []
+
+metrics:
+  enabled: false
+  serviceMonitor:
+    enabled: false
+    namespace: ""
+    interval: ""
+    scrapeTimeout: ""
+    honorLabels: false
+    labels: {}
+    annotations: {}
+    relabelings: []
+    metricRelabelings: []
+    endpoints:
+      - port: http
+        path: /metrics
+        interval: ""
+        scrapeTimeout: ""
+
+persistence:
+  enabled: true
+  existingClaim: ""
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+  annotations: {}
+  mountPath: /storage
+
+migrationJob:
+  enabled: true
+  annotations: {}
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+  podAnnotations: {}
+  podLabels: {}
+  serviceAccountName: ""
+  image:
+    registry: ""
+    repository: ""
+    tag: ""
+    pullPolicy: ""
+    pullSecrets: []
+  command:
+    - /bin/dbmate
+  args:
+    - --url=sqlite:/storage/var/ncps/db/db.sqlite
+    - up
+  env: []
+  initContainers: []
+  resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  securityContext: {}
+  extraVolumeMounts: []
+  extraVolumes: []
