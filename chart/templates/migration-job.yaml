@@ -1,0 +1,91 @@
+{{- if and .Values.migrationJob.enabled .Values.persistence.enabled }}
+{{- $jobName := include "ncps.migrationJobName" . -}}
+{{- $jobImage := include "ncps.migrationJobImage" . -}}
+{{- $jobPullPolicy := default .Values.image.pullPolicy .Values.migrationJob.image.pullPolicy -}}
+{{- $storageVolume := include "ncps.storageVolume" . | fromYaml -}}
+{{- $storageVolumeMount := include "ncps.storageVolumeMount" . | fromYaml -}}
+{{- $volumes := concat (list $storageVolume) (.Values.migrationJob.extraVolumes | default (list)) -}}
+{{- $volumeMounts := concat (list $storageVolumeMount) (.Values.migrationJob.extraVolumeMounts | default (list)) -}}
+{{- $jobLabels := merge (dict) (include "ncps.selectorLabels" . | fromYaml) (.Values.migrationJob.podLabels | default (dict)) -}}
+{{- $pullSecrets := concat
+  (.Values.global.imagePullSecrets | default (list))
+  (.Values.image.pullSecrets | default (list))
+  (.Values.migrationJob.image.pullSecrets | default (list)) | uniq -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $jobName }}
+  labels:
+{{ include "ncps.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    {{- with .Values.migrationJob.annotations }}
+{{ toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  backoffLimit: {{ .Values.migrationJob.backoffLimit }}
+  ttlSecondsAfterFinished: {{ .Values.migrationJob.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+{{ toYaml $jobLabels | nindent 8 }}
+      {{- with .Values.migrationJob.podAnnotations }}
+      annotations:
+{{ toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      restartPolicy: Never
+      {{- $serviceAccount := default (include "service-base.serviceAccountName" .) .Values.migrationJob.serviceAccountName }}
+      serviceAccountName: {{ $serviceAccount }}
+      {{- if $pullSecrets }}
+      imagePullSecrets:
+        {{- range $secret := $pullSecrets }}
+        - name: {{ $secret }}
+        {{- end }}
+      {{- end }}
+      containers:
+        - name: migrate
+          image: {{ $jobImage | quote }}
+          imagePullPolicy: {{ $jobPullPolicy }}
+          {{- if .Values.migrationJob.command }}
+          command:
+{{ toYaml .Values.migrationJob.command | nindent 12 }}
+          {{- end }}
+          {{- if .Values.migrationJob.args }}
+          args:
+{{ toYaml .Values.migrationJob.args | nindent 12 }}
+          {{- end }}
+          {{- if .Values.migrationJob.env }}
+          env:
+{{ toYaml .Values.migrationJob.env | nindent 12 }}
+          {{- end }}
+          {{- if .Values.migrationJob.securityContext }}
+          securityContext:
+{{ toYaml .Values.migrationJob.securityContext | nindent 12 }}
+          {{- end }}
+          {{- if $volumeMounts }}
+          volumeMounts:
+{{ toYaml $volumeMounts | nindent 12 }}
+          {{- end }}
+          {{- with .Values.migrationJob.resources }}
+          resources:
+{{ toYaml . | nindent 12 }}
+          {{- end }}
+      {{- if $volumes }}
+      volumes:
+{{ toYaml $volumes | nindent 8 }}
+      {{- end }}
+      {{- with .Values.migrationJob.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.migrationJob.affinity }}
+      affinity:
+{{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.migrationJob.tolerations }}
+      tolerations:
+{{ toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

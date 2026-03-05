@@ -1,0 +1,15 @@
+{{- $values := deepCopy .Values -}}
+{{- if and .Values.persistence.enabled }}
+{{- $storageVolume := include "ncps.storageVolume" . | fromYaml -}}
+{{- $extraVolumes := $values.extraVolumes | default (list) -}}
+{{- $extraVolumes = concat (list $storageVolume) $extraVolumes -}}
+{{- $_ := set $values "extraVolumes" $extraVolumes -}}
+
+{{- $storageVolumeMount := include "ncps.storageVolumeMount" . | fromYaml -}}
+{{- $extraVolumeMounts := $values.extraVolumeMounts | default (list) -}}
+{{- $extraVolumeMounts = concat (list $storageVolumeMount) $extraVolumeMounts -}}
+{{- $_ := set $values "extraVolumeMounts" $extraVolumeMounts -}}
+{{- end }}
+
+{{- $ctx := dict "Chart" .Chart "Values" $values "Release" .Release "Capabilities" .Capabilities "Template" .Template "Files" .Files -}}
+{{ include "service-base.deployment" $ctx }}
