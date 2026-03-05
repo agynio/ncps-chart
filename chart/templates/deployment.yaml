@@ -1,0 +1,20 @@
+{{- $values := deepCopy .Values -}}
+
+{{- $extraVolumes := include "ncps.mergeExtraVolumes" (dict "Values" $values "Ctx" .) | fromYaml -}}
+{{- if $extraVolumes -}}
+  {{- $_ := set $values "extraVolumes" $extraVolumes -}}
+{{- end -}}
+
+{{- $extraVolumeMounts := include "ncps.mergeExtraVolumeMounts" (dict "Values" $values "Ctx" .) | fromYaml -}}
+{{- if $extraVolumeMounts -}}
+  {{- $_ := set $values "extraVolumeMounts" $extraVolumeMounts -}}
+{{- end -}}
+
+{{- $persistence := default (dict) $values.persistence -}}
+{{- if and $persistence.enabled (not $persistence.existingClaim) -}}
+  {{- $_ := set $persistence "existingClaim" (include "ncps.persistence.claimName" .) -}}
+  {{- $_ := set $values "persistence" $persistence -}}
+{{- end -}}
+
+{{- $ctx := dict "Chart" .Chart "Values" $values "Release" .Release "Capabilities" .Capabilities "Template" .Template "Files" .Files -}}
+{{ include "service-base.deployment" $ctx }}

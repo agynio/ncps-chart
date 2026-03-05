@@ -1,0 +1,157 @@
+nameOverride: ""
+fullnameOverride: ""
+
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+
+podSecurityContext:
+  enabled: false
+  fsGroup: null
+
+image:
+  registry: ""
+  repository: kalbasit/ncps
+  tag: latest
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+replicaCount: 1
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: null
+  metrics: []
+  behavior: {}
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+command:
+  - /bin/ncps
+args:
+  - serve
+  - --server-addr=0.0.0.0:8501
+  - --cache-hostname=ncps
+  - --cache-data-path=/storage
+  - --cache-database-url=sqlite:/storage/var/ncps/db/db.sqlite
+  - --upstream-cache=https://cache.nixos.org
+  - --upstream-public-key=cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+
+env:
+  - name: PROMETHEUS_ENABLED
+    value: "true"
+
+containerPorts:
+  - name: http
+    containerPort: 8501
+    protocol: TCP
+
+service:
+  enabled: true
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8501
+      targetPort: http
+      protocol: TCP
+
+initContainers:
+  - name: ncps-init
+    image: alpine:3.20
+    command:
+      - /bin/sh
+      - -c
+      - mkdir -m 0755 -p /storage/var && mkdir -m 0700 -p /storage/var/ncps && mkdir -m 0700 -p /storage/var/ncps/db
+    volumeMounts:
+      - name: storage
+        mountPath: /storage
+
+extraVolumes: []
+
+extraVolumeMounts: []
+
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /nix-cache-info
+    port: http
+  failureThreshold: 3
+  periodSeconds: 30
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /nix-cache-info
+    port: http
+  failureThreshold: 3
+  periodSeconds: 10
+
+startupProbe:
+  enabled: true
+  httpGet:
+    path: /nix-cache-info
+    port: http
+  failureThreshold: 12
+  periodSeconds: 5
+
+securityContext:
+  enabled: true
+  runAsNonRoot: false
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
+
+persistence:
+  enabled: true
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+  storageClass: ""
+  existingClaim: ""
+
+metrics:
+  enabled: false
+  serviceMonitor:
+    enabled: false
+    namespace: ""
+    interval: ""
+    scrapeTimeout: ""
+    honorLabels: false
+    labels: {}
+    annotations: {}
+    relabelings: []
+    metricRelabelings: []
+    endpoints:
+      - port: http
+        path: /metrics
+        interval: ""
+        scrapeTimeout: ""
+
+migrationJob:
+  enabled: true
+  annotations: {}
+  labels: {}
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+  serviceAccountName: ""
+  command:
+    - /bin/dbmate
+  args:
+    - --url=sqlite:/storage/var/ncps/db/db.sqlite
+    - up
+  env: []
+  envFrom: []
+  resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}

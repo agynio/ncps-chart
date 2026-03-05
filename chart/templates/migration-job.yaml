@@ -1,0 +1,96 @@
+{{- if .Values.migrationJob.enabled -}}
+{{- $values := deepCopy .Values -}}
+
+{{- $persistence := default (dict) $values.persistence -}}
+{{- if and $persistence.enabled (not $persistence.existingClaim) -}}
+  {{- $_ := set $persistence "existingClaim" (include "ncps.persistence.claimName" .) -}}
+  {{- $_ := set $values "persistence" $persistence -}}
+{{- end -}}
+
+{{- $ctx := dict "Chart" .Chart "Values" $values "Release" .Release "Capabilities" .Capabilities "Template" .Template "Files" .Files -}}
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "ncps.migrationJobName" . }}
+  labels:
+{{ include "service-base.labels" $ctx | nindent 4 }}
+{{- with .Values.migrationJob.labels }}
+{{ toYaml . | nindent 4 }}
+{{- end }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+{{- with .Values.migrationJob.annotations }}
+{{ toYaml . | nindent 4 }}
+{{- end }}
+spec:
+  {{- if .Values.migrationJob.backoffLimit }}
+  backoffLimit: {{ .Values.migrationJob.backoffLimit }}
+  {{- end }}
+  {{- if .Values.migrationJob.ttlSecondsAfterFinished }}
+  ttlSecondsAfterFinished: {{ .Values.migrationJob.ttlSecondsAfterFinished }}
+  {{- end }}
+  template:
+    metadata:
+      labels:
+{{ include "service-base.selectorLabels" $ctx | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      {{- $serviceAccount := default (include "service-base.serviceAccountName" $ctx) .Values.migrationJob.serviceAccountName }}
+      serviceAccountName: {{ $serviceAccount }}
+{{ include "service-base.imagePullSecrets" $ctx | nindent 6 }}
+{{- $podSecurityContext := include "service-base.podSecurityContext" $ctx }}
+{{- if $podSecurityContext }}
+      securityContext:
+{{ $podSecurityContext | nindent 8 }}
+{{- end }}
+      containers:
+        - name: migrate
+          image: {{ include "service-base.image" $ctx | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+{{- with .Values.migrationJob.command }}
+          command:
+{{ toYaml . | nindent 12 }}
+{{- end }}
+{{- with .Values.migrationJob.args }}
+          args:
+{{ toYaml . | nindent 12 }}
+{{- end }}
+{{- with .Values.migrationJob.env }}
+          env:
+{{ toYaml . | nindent 12 }}
+{{- end }}
+{{- with .Values.migrationJob.envFrom }}
+          envFrom:
+{{ toYaml . | nindent 12 }}
+{{- end }}
+{{- $containerSecurityContext := include "service-base.securityContext" $ctx }}
+{{- if $containerSecurityContext }}
+          securityContext:
+{{ $containerSecurityContext | nindent 12 }}
+{{- end }}
+{{- with .Values.migrationJob.resources }}
+          resources:
+{{ toYaml . | nindent 12 }}
+{{- end }}
+          volumeMounts:
+            - name: storage
+              mountPath: /storage
+      volumes:
+        - name: storage
+          persistentVolumeClaim:
+            claimName: {{ include "ncps.persistence.claimName" . }}
+{{- with .Values.migrationJob.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | nindent 8 }}
+{{- end }}
+{{- with .Values.migrationJob.affinity }}
+      affinity:
+{{ toYaml . | nindent 8 }}
+{{- end }}
+{{- with .Values.migrationJob.tolerations }}
+      tolerations:
+{{ toYaml . | nindent 8 }}
+{{- end }}
+{{- end }}

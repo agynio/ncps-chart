@@ -1,0 +1,11 @@
+apiVersion: v2
+name: ncps
+description: NCPS cache service packaged with the agynio service-base library chart.
+type: application
+version: 0.1.0
+appVersion: latest
+
+dependencies:
+  - name: service-base
+    version: 0.1.4
+    repository: oci://ghcr.io/agynio/charts
